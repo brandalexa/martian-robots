@@ -116,8 +116,8 @@ function parsePosition(line: Line, upperRight: Coordinate): Position {
 	}
 
 	const start = {
-		x: parseCoordinate(x, "x", upperRight.x, line),
-		y: parseCoordinate(y, "y", upperRight.y, line),
+		x: parseStartCoordinate(x, "x", upperRight.x, line),
+		y: parseStartCoordinate(y, "y", upperRight.y, line),
 	};
 	if (!isOneOf(ORIENTATIONS, orientation)) {
 		throw new ParseError(
@@ -156,6 +156,23 @@ function parseCoordinate(
 	if (!WHOLE_NUMBER.test(token) || value > max) {
 		throw new ParseError(
 			`${axis} must be a whole number from 0 to ${max}, got "${token}"`,
+			line.number,
+		);
+	}
+	return value;
+}
+
+/** A robot's starting coordinate must be within the brief's limit and on the grid. */
+function parseStartCoordinate(
+	token: string,
+	axis: "x" | "y",
+	gridMax: number,
+	line: Line,
+): number {
+	const value = parseCoordinate(token, axis, MAX_COORDINATE, line);
+	if (value > gridMax) {
+		throw new ParseError(
+			`start ${axis} ${value} is outside the grid (0 to ${gridMax})`,
 			line.number,
 		);
 	}
