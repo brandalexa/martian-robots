@@ -10,9 +10,10 @@ const SAMPLE_INPUT_FILE = join(
 	"../examples/sample-input.txt",
 );
 const SAMPLE_INPUT = readFileSync(SAMPLE_INPUT_FILE, "utf8");
-
-// Until the robots are simulated, valid input is echoed back.
-const SAMPLE_OUTPUT = SAMPLE_INPUT;
+const SAMPLE_OUTPUT = readFileSync(
+	join(import.meta.dirname, "../examples/sample-output.txt"),
+	"utf8",
+);
 
 function runCli(args: string[], stdin = "") {
 	return spawnSync(process.execPath, [CLI, ...args], {

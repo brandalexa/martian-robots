@@ -2,7 +2,10 @@
 export const ORIENTATIONS = ["N", "E", "S", "W"] as const;
 export type Orientation = (typeof ORIENTATIONS)[number];
 
-/** Every instruction letter robots understand. New command types start here. */
+/**
+ * Every instruction letter robots understand. New command types start here,
+ * and the compiler will then ask for a handler in `COMMANDS`.
+ */
 export const INSTRUCTIONS = ["L", "R", "F"] as const;
 export type Instruction = (typeof INSTRUCTIONS)[number];
 
@@ -26,4 +29,10 @@ export interface Mission {
 	/** The lower-left corner is always (0, 0). */
 	readonly upperRight: Coordinate;
 	readonly robots: readonly RobotPlan[];
+}
+
+export interface RobotOutcome {
+	/** Where the robot finished, or the last grid point it held if lost. */
+	readonly position: Position;
+	readonly lost: boolean;
 }
