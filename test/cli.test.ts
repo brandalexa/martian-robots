@@ -11,7 +11,7 @@ const SAMPLE_INPUT_FILE = join(
 );
 const SAMPLE_INPUT = readFileSync(SAMPLE_INPUT_FILE, "utf8");
 
-// The simulation is currently a no-op that echoes its input.
+// Until the robots are simulated, valid input is echoed back.
 const SAMPLE_OUTPUT = SAMPLE_INPUT;
 
 function runCli(args: string[], stdin = "") {
@@ -54,5 +54,14 @@ describe("cli", () => {
 		assert.equal(result.status, 1);
 	});
 
-	it.todo("reports invalid input on stderr and exits 1");
+	it("reports invalid input on stderr and exits 1", () => {
+		const result = runCli([], "5 3\n1 1 X\nF\n");
+
+		assert.equal(result.stdout, "");
+		assert.equal(
+			result.stderr,
+			'martian-robots: invalid input: line 2: orientation must be one of N, E, S, W, got "X"\n',
+		);
+		assert.equal(result.status, 1);
+	});
 });
