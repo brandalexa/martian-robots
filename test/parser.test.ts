@@ -11,10 +11,6 @@ FRRFLLFFRRFLL
 LLFFFLFLFL
 `;
 
-function assertParseError(input: string, line: number, message: RegExp) {
-	assert.throws(() => parse(input), { name: "ParseError", line, message });
-}
-
 describe("parse", () => {
 	it("parses the sample input from the brief", () => {
 		assert.deepEqual(parse(SAMPLE_INPUT), {
@@ -36,12 +32,29 @@ describe("parse", () => {
 		});
 	});
 
-	it("tolerates no final newline, CRLF, trailing blank lines and extra whitespace", () => {
-		const expected = parse(SAMPLE_INPUT);
+	it("accepts a world with no robots", () => {
+		assert.deepEqual(parse("5 3\n"), {
+			upperRight: { x: 5, y: 3 },
+			robots: [],
+		});
+	});
 
-		assert.deepEqual(parse(SAMPLE_INPUT.trimEnd()), expected);
-		assert.deepEqual(parse(SAMPLE_INPUT.replaceAll("\n", "\r\n")), expected);
-		assert.deepEqual(parse(`${SAMPLE_INPUT}\n \n\n`), expected);
+	it("accepts input without a final newline", () => {
+		assert.deepEqual(parse(SAMPLE_INPUT.trimEnd()), parse(SAMPLE_INPUT));
+	});
+
+	it("accepts Windows line endings", () => {
+		assert.deepEqual(
+			parse(SAMPLE_INPUT.replaceAll("\n", "\r\n")),
+			parse(SAMPLE_INPUT),
+		);
+	});
+
+	it("ignores blank lines at the end", () => {
+		assert.deepEqual(parse(`${SAMPLE_INPUT}\n \n\n`), parse(SAMPLE_INPUT));
+	});
+
+	it("ignores extra whitespace around and between values", () => {
 		assert.deepEqual(parse(" 5\t 3 \n 1   1  E \n RF \n"), {
 			upperRight: { x: 5, y: 3 },
 			robots: [
@@ -50,95 +63,170 @@ describe("parse", () => {
 		});
 	});
 
-	it("accepts the brief's limits, a single-point world and no robots", () => {
-		const largest = parse(`50 50\n50 50 N\n${"F".repeat(99)}\n`);
-		assert.deepEqual(largest.upperRight, { x: 50, y: 50 });
-		assert.deepEqual(largest.robots[0]?.start, {
-			x: 50,
-			y: 50,
-			orientation: "N",
-		});
-		assert.equal(largest.robots[0]?.instructions.length, 99);
+	it("treats a blank instruction line as no instructions", () => {
+		const { robots } = parse("5 3\n1 1 E\n\n2 2 N\nF\n3 3 S\n\n");
 
-		assert.deepEqual(parse("0 0\n0 0 N\nF\n"), {
-			upperRight: { x: 0, y: 0 },
-			robots: [
-				{ start: { x: 0, y: 0, orientation: "N" }, instructions: ["F"] },
-			],
-		});
-		assert.deepEqual(parse("5 3\n"), {
-			upperRight: { x: 5, y: 3 },
-			robots: [],
-		});
-	});
-
-	it("rejects empty input and malformed grid sizes", () => {
-		assertParseError("", 1, /input is empty/);
-		assertParseError("5\n", 1, /expected grid size "<x> <y>", got "5"/);
-		assertParseError(
-			"-1 3\n",
-			1,
-			/x must be a whole number from 0 to 50, got "-1"/,
-		);
-		assertParseError(
-			"5 51\n",
-			1,
-			/y must be a whole number from 0 to 50, got "51"/,
+		assert.deepEqual(
+			robots.map((robot) => robot.instructions),
+			[[], ["F"], []],
 		);
 	});
 
-	it("rejects malformed robot positions", () => {
-		assertParseError(
-			"5 3\n1 1\nF\n",
-			2,
-			/expected robot position "<x> <y> <orientation>", got "1 1"/,
+	it("accepts values at the brief's limits", () => {
+		const { upperRight, robots } = parse(
+			`50 50\n50 50 N\n${"F".repeat(99)}\n0 0 S\nL\n`,
 		);
-		// A later robot, to check the reported line number.
-		assertParseError(
-			`${SAMPLE_INPUT}1 1 X\nF\n`,
-			8,
-			/orientation must be one of N, E, S, W, got "X"/,
-		);
+
+		assert.deepEqual(upperRight, { x: 50, y: 50 });
+		assert.deepEqual(robots[0]?.start, { x: 50, y: 50, orientation: "N" });
+		assert.equal(robots[0]?.instructions.length, 99);
 	});
 
-	it("rejects robots starting outside the grid", () => {
-		assertParseError(
-			"5 3\n6 1 E\nF\n",
-			2,
-			/start x 6 is outside the grid \(0 to 5\)/,
-		);
-		assertParseError(
-			"5 3\n1 4 N\nF\n",
-			2,
-			/start y 4 is outside the grid \(0 to 3\)/,
-		);
+	it("accepts a single-point world", () => {
+		const { upperRight, robots } = parse("0 0\n0 0 N\nF\n");
+
+		assert.deepEqual(upperRight, { x: 0, y: 0 });
+		assert.deepEqual(robots[0]?.start, { x: 0, y: 0, orientation: "N" });
 	});
 
-	it("rejects unknown instructions and instruction lines of 100 characters", () => {
-		assertParseError(
-			"5 3\n1 1 E\nRFX\n",
-			3,
-			/unknown instruction "X", expected one of L, R, F/,
-		);
-		assertParseError(
-			`5 3\n1 1 E\n${"F".repeat(100)}\n`,
-			3,
-			/instructions must be at most 99 characters, got 100/,
-		);
-	});
+	describe("rejects", () => {
+		const cases: {
+			name: string;
+			input: string;
+			line: number;
+			message: RegExp;
+		}[] = [
+			{ name: "empty input", input: "", line: 1, message: /input is empty/ },
+			{
+				name: "input with only blank lines",
+				input: "\n  \n",
+				line: 1,
+				message: /input is empty/,
+			},
+			{
+				name: "a blank first line",
+				input: "\n5 3\n",
+				line: 1,
+				message: /expected grid size "<x> <y>", got ""/,
+			},
+			{
+				name: "a grid with one value",
+				input: "5\n",
+				line: 1,
+				message: /expected grid size "<x> <y>", got "5"/,
+			},
+			{
+				name: "a grid with three values",
+				input: "5 3 1\n",
+				line: 1,
+				message: /expected grid size/,
+			},
+			{
+				name: "a non-numeric grid size",
+				input: "5 y\n",
+				line: 1,
+				message: /y must be a whole number from 0 to 50, got "y"/,
+			},
+			{
+				name: "a negative grid size",
+				input: "-1 3\n",
+				line: 1,
+				message: /x must be a whole number from 0 to 50, got "-1"/,
+			},
+			{
+				name: "a fractional grid size",
+				input: "5.5 3\n",
+				line: 1,
+				message: /x must be a whole number/,
+			},
+			{
+				name: "a grid size above 50",
+				input: "51 3\n",
+				line: 1,
+				message: /x must be a whole number from 0 to 50, got "51"/,
+			},
+			{
+				name: "a position without an orientation",
+				input: "5 3\n1 1\nF\n",
+				line: 2,
+				message: /expected robot position "<x> <y> <orientation>", got "1 1"/,
+			},
+			{
+				name: "a position with extra values",
+				input: "5 3\n1 1 E E\nF\n",
+				line: 2,
+				message: /expected robot position/,
+			},
+			{
+				name: "an unknown orientation",
+				input: "5 3\n1 1 X\nF\n",
+				line: 2,
+				message: /orientation must be one of N, E, S, W, got "X"/,
+			},
+			{
+				name: "a lowercase orientation",
+				input: "5 3\n1 1 e\nF\n",
+				line: 2,
+				message: /orientation must be one of N, E, S, W, got "e"/,
+			},
+			{
+				name: "a robot starting east of the grid",
+				input: "5 3\n6 1 E\nF\n",
+				line: 2,
+				message: /x must be a whole number from 0 to 5, got "6"/,
+			},
+			{
+				name: "a robot starting north of the grid",
+				input: "5 3\n1 4 N\nF\n",
+				line: 2,
+				message: /y must be a whole number from 0 to 3, got "4"/,
+			},
+			{
+				name: "a robot without an instruction line",
+				input: "5 3\n1 1 E\n",
+				line: 2,
+				message: /robot has no instruction line/,
+			},
+			{
+				name: "an unknown instruction",
+				input: "5 3\n1 1 E\nRFX\n",
+				line: 3,
+				message: /unknown instruction "X", expected one of L, R, F/,
+			},
+			{
+				name: "a lowercase instruction",
+				input: "5 3\n1 1 E\nrf\n",
+				line: 3,
+				message: /unknown instruction "r"/,
+			},
+			{
+				name: "instructions of 100 characters",
+				input: `5 3\n1 1 E\n${"F".repeat(100)}\n`,
+				line: 3,
+				message: /instructions must be at most 99 characters, got 100/,
+			},
+			{
+				name: "a blank line between robots",
+				input: "5 3\n1 1 E\nF\n\n2 2 N\nF\n",
+				line: 4,
+				message: /blank line where a robot position was expected/,
+			},
+			{
+				name: "an error in a later robot, reporting its line",
+				input: `${SAMPLE_INPUT}1 1 Q\nF\n`,
+				line: 8,
+				message: /orientation must be one of N, E, S, W, got "Q"/,
+			},
+		];
 
-	it("rejects missing instruction lines and blank lines between robot lines", () => {
-		assertParseError("5 3\n1 1 E\n", 2, /robot has no instruction line/);
-		assertParseError("5 3\n1 1 E\n\n \n", 2, /robot has no instruction line/);
-		assertParseError(
-			"5 3\n1 1 E\n\nRF\n",
-			3,
-			/blank line where robot instructions were expected/,
-		);
-		assertParseError(
-			"5 3\n1 1 E\nF\n\n2 2 N\nF\n",
-			4,
-			/blank line where a robot position was expected/,
-		);
+		for (const { name, input, line, message } of cases) {
+			it(name, () => {
+				assert.throws(() => parse(input), {
+					name: "ParseError",
+					line,
+					message,
+				});
+			});
+		}
 	});
 });

@@ -25,16 +25,15 @@ interface Line {
 /**
  * Parses the world size and robot plans from the brief's input format.
  *
- * Blank lines are only allowed at the end of the input, so every robot has a
- * non-empty instruction line.
+ * Blank lines are only allowed as an empty instruction line (a robot that
+ * doesn't move) or at the end of the input.
  *
  * @throws {ParseError} if the input is malformed or exceeds the brief's limits.
  */
 export function parse(input: string): Mission {
-	const [gridLine, ...robotLines] = withoutTrailingBlankLines(
-		splitLines(input),
-	);
-	if (gridLine === undefined) {
+	const lines = splitLines(input);
+	const [gridLine, ...robotLines] = lines;
+	if (gridLine === undefined || lines.every(isBlank)) {
 		throw new ParseError("input is empty", 1);
 	}
 
@@ -43,14 +42,12 @@ export function parse(input: string): Mission {
 }
 
 function splitLines(input: string): Line[] {
-	return input
-		.split(/\r?\n/)
-		.map((text, index) => ({ text: text.trim(), number: index + 1 }));
-}
-
-function withoutTrailingBlankLines(lines: readonly Line[]): Line[] {
-	const lastContentIndex = lines.findLastIndex((line) => !isBlank(line));
-	return lines.slice(0, lastContentIndex + 1);
+	const texts = input.split(/\r?\n/);
+	// A final newline ends the last line rather than starting an empty one.
+	if (texts.at(-1) === "") {
+		texts.pop();
+	}
+	return texts.map((text, index) => ({ text: text.trim(), number: index + 1 }));
 }
 
 function isBlank(line: Line): boolean {
@@ -76,31 +73,35 @@ function parseRobots(
 	upperRight: Coordinate,
 ): RobotPlan[] {
 	const robots: RobotPlan[] = [];
-	// Each robot spans two lines, so the loop body takes the instruction line
-	// from the same iterator.
-	const remaining = lines.values();
-	for (const positionLine of remaining) {
-		const start = parsePosition(positionLine, upperRight);
-		const instructionLine = remaining.next().value;
-		if (instructionLine === undefined) {
+	let pending: { start: Position; line: Line } | undefined;
+	let firstBlank: Line | undefined;
+
+	for (const line of lines) {
+		if (pending !== undefined) {
+			robots.push({
+				start: pending.start,
+				instructions: parseInstructions(line),
+			});
+			pending = undefined;
+		} else if (isBlank(line)) {
+			firstBlank ??= line;
+		} else if (firstBlank !== undefined) {
 			throw new ParseError(
-				"robot has no instruction line",
-				positionLine.number,
+				"blank line where a robot position was expected",
+				firstBlank.number,
 			);
+		} else {
+			pending = { start: parsePosition(line, upperRight), line };
 		}
-		robots.push({ start, instructions: parseInstructions(instructionLine) });
+	}
+
+	if (pending !== undefined) {
+		throw new ParseError("robot has no instruction line", pending.line.number);
 	}
 	return robots;
 }
 
 function parsePosition(line: Line, upperRight: Coordinate): Position {
-	if (isBlank(line)) {
-		throw new ParseError(
-			"blank line where a robot position was expected",
-			line.number,
-		);
-	}
-
 	const [x, y, orientation, ...extra] = line.text.split(WHITESPACE);
 	if (
 		x === undefined ||
@@ -115,8 +116,8 @@ function parsePosition(line: Line, upperRight: Coordinate): Position {
 	}
 
 	const start = {
-		x: parseStartCoordinate(x, "x", upperRight.x, line),
-		y: parseStartCoordinate(y, "y", upperRight.y, line),
+		x: parseCoordinate(x, "x", upperRight.x, line),
+		y: parseCoordinate(y, "y", upperRight.y, line),
 	};
 	if (!isOneOf(ORIENTATIONS, orientation)) {
 		throw new ParseError(
@@ -128,12 +129,6 @@ function parsePosition(line: Line, upperRight: Coordinate): Position {
 }
 
 function parseInstructions(line: Line): Instruction[] {
-	if (isBlank(line)) {
-		throw new ParseError(
-			"blank line where robot instructions were expected",
-			line.number,
-		);
-	}
 	if (line.text.length > MAX_INSTRUCTION_LENGTH) {
 		throw new ParseError(
 			`instructions must be at most ${MAX_INSTRUCTION_LENGTH} characters, got ${line.text.length}`,
@@ -161,23 +156,6 @@ function parseCoordinate(
 	if (!WHOLE_NUMBER.test(token) || value > max) {
 		throw new ParseError(
 			`${axis} must be a whole number from 0 to ${max}, got "${token}"`,
-			line.number,
-		);
-	}
-	return value;
-}
-
-/** A robot's starting coordinate must be within the brief's limit and on the grid. */
-function parseStartCoordinate(
-	token: string,
-	axis: "x" | "y",
-	gridMax: number,
-	line: Line,
-): number {
-	const value = parseCoordinate(token, axis, MAX_COORDINATE, line);
-	if (value > gridMax) {
-		throw new ParseError(
-			`start ${axis} ${value} is outside the grid (0 to ${gridMax})`,
 			line.number,
 		);
 	}
