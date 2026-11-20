@@ -1,0 +1,24 @@
+{
+	"name": "martian-robots",
+	"version": "1.0.0",
+	"private": true,
+	"license": "UNLICENSED",
+	"type": "module",
+	"bin": {
+		"martian-robots": "./dist/cli.js"
+	},
+	"engines": {
+		"node": ">=26"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.build.json",
+		"start": "node dist/cli.js",
+		"format": "biome check --write ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.6.8",
+		"@types/node": "^26.6.6",
+		"tsx": "^4.23.15",
+		"typescript": "^7.0.2"
+	}
+}
