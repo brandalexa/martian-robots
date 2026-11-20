@@ -2,12 +2,14 @@
 	"compilerOptions": {
 		"target": "ES2024",
 		"lib": ["ES2024"],
+		"types": ["node"],
 		"module": "NodeNext",
 		"strict": true,
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
 		"rewriteRelativeImportExtensions": true,
 		"isolatedModules": true,
+		"erasableSyntaxOnly": true,
 		"skipLibCheck": true,
 		"noEmit": true
 	},

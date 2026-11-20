@@ -4,15 +4,14 @@
 	"private": true,
 	"license": "UNLICENSED",
 	"type": "module",
-	"bin": {
-		"martian-robots": "./dist/cli.js"
-	},
 	"engines": {
 		"node": ">=26"
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
 		"start": "node dist/cli.js",
+		"test": "node --test",
+		"typecheck": "tsc",
 		"format": "biome check --write ."
 	},
 	"devDependencies": {
