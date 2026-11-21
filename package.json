@@ -8,8 +8,7 @@
 		"node": ">=26"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
-		"start": "node dist/cli.js",
+		"start": "node src/cli.ts",
 		"test": "node --test",
 		"typecheck": "tsc",
 		"format": "biome check --write ."
@@ -17,7 +16,6 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.6.8",
 		"@types/node": "^26.6.6",
-		"tsx": "^4.23.15",
 		"typescript": "^7.0.2"
 	}
 }
